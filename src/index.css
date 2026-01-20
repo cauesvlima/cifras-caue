@@ -1,0 +1,106 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --app-ink: #1e1a16;
+  --app-muted: #5a524b;
+  --app-paper: #f6f1ea;
+  --app-panel: #fbf7f2;
+  --app-accent: #bf7b3f;
+  --app-accent-soft: #e5c7a8;
+  --app-shadow: 0 24px 60px rgba(22, 15, 7, 0.18);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+@layer base {
+  html {
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    color: var(--app-ink);
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(circle at 20% 20%, rgba(191, 123, 63, 0.12), transparent 40%),
+      radial-gradient(circle at 80% 10%, rgba(91, 155, 213, 0.12), transparent 35%),
+      linear-gradient(180deg, #f7f1e9 0%, #efe7dc 55%, #eae0d4 100%);
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  textarea,
+  input,
+  select,
+  button {
+    font: inherit;
+  }
+}
+
+@layer components {
+  .card-surface {
+    background: var(--app-panel);
+    border: 1px solid rgba(30, 26, 22, 0.08);
+    border-radius: 20px;
+    box-shadow: var(--app-shadow);
+  }
+
+  .a4-page {
+    width: 210mm;
+    min-height: 297mm;
+    padding: 20mm 16mm;
+    background: #fff;
+    box-shadow: 0 20px 40px rgba(16, 13, 9, 0.15);
+    border-radius: 18px;
+  }
+
+  .mono-editor {
+    font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  }
+
+  .step-pill {
+    background: rgba(191, 123, 63, 0.12);
+    color: #6b3f1f;
+    border: 1px solid rgba(191, 123, 63, 0.35);
+    border-radius: 999px;
+  }
+}
+
+@media print {
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .a4-page {
+    box-shadow: none;
+    border-radius: 0;
+    padding: 0;
+    width: auto;
+    min-height: auto;
+  }
+
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+}
