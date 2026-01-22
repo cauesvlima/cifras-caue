@@ -15,6 +15,17 @@ const CHORD_COLORS = [
   { label: "Azul médio", value: "#2f5a8a" },
 ]
 
+const MARGIN_PRESETS = [
+  { label: "Padrão", value: 12 },
+  { label: "Compacto", value: 6 },
+  { label: "Mínimo", value: 3 },
+]
+
+const LAYOUT_OPTIONS = [
+  { label: "1 coluna", value: "single" as const },
+  { label: "2 colunas", value: "double" as const },
+]
+
 type SidePanelSettingsProps = {
   settings: PrintSettings
   onChange: (next: PrintSettings) => void
@@ -25,6 +36,7 @@ type SidePanelSettingsProps = {
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
 
 const SidePanelSettings = ({ settings, onChange, onReset, onPrint }: SidePanelSettingsProps) => {
+  const isTwoColumns = settings.printLayout === "double"
   const update = <K extends keyof PrintSettings>(field: K, value: PrintSettings[K]) => {
     onChange({ ...settings, [field]: value })
   }
@@ -46,6 +58,89 @@ const SidePanelSettings = ({ settings, onChange, onReset, onPrint }: SidePanelSe
         <div className="flex items-center justify-between rounded-xl border border-black/10 bg-white/70 px-4 py-2">
           <span>A4</span>
           <span className="text-xs text-black/50">Fixo</span>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-black/40">
+          Margens
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {MARGIN_PRESETS.map((preset) => (
+            <button
+              key={preset.value}
+              type="button"
+              onClick={() => update("printMarginMm", preset.value)}
+              className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                settings.printMarginMm === preset.value
+                  ? "border-black/40 bg-black/5"
+                  : "border-black/10 bg-white"
+              }`}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+        <div className="space-y-2">
+          <span className="text-xs font-semibold text-black/60">Ajuste manual (mm)</span>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={3}
+              max={20}
+              step={1}
+              value={settings.printMarginMm}
+              onChange={(event) => {
+                const value = event.target.valueAsNumber
+                if (Number.isNaN(value)) return
+                update("printMarginMm", clamp(value, 3, 20))
+              }}
+              className="w-20 rounded-xl border border-black/10 bg-white/70 px-3 py-2 text-xs"
+            />
+            <span className="text-xs text-black/50">mm</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-black/40">
+          Layout de impressão
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {LAYOUT_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => update("printLayout", option.value)}
+              className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                settings.printLayout === option.value
+                  ? "border-black/40 bg-black/5"
+                  : "border-black/10 bg-white"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <div className="space-y-2">
+          <span className="text-xs font-semibold text-black/60">Espaço entre colunas (mm)</span>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={4}
+              max={20}
+              step={1}
+              value={settings.columnGapMm}
+              disabled={!isTwoColumns}
+              onChange={(event) => {
+                const value = event.target.valueAsNumber
+                if (Number.isNaN(value)) return
+                update("columnGapMm", clamp(value, 4, 20))
+              }}
+              className="w-20 rounded-xl border border-black/10 bg-white/70 px-3 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            <span className="text-xs text-black/50">mm</span>
+          </div>
         </div>
       </div>
 

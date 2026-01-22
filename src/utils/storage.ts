@@ -1,4 +1,4 @@
-import type { AppState } from "../types"
+import type { AppState, PrintSettings } from "../types"
 import { DEFAULT_PRINT_SETTINGS, DEFAULT_SONG_META, DEFAULT_STATE, STORAGE_KEY } from "../state/defaults"
 
 type LegacyChartLine = {
@@ -28,7 +28,7 @@ export const normalizeState = (input: LegacyState | null | undefined): AppState 
   }
 
   const rawPrintSettings = { ...DEFAULT_PRINT_SETTINGS, ...(input?.printSettings ?? {}) }
-  const printSettings = {
+  const printSettings: PrintSettings = {
     ...rawPrintSettings,
     fontSize:
       typeof rawPrintSettings.fontSize === "number"
@@ -38,6 +38,15 @@ export const normalizeState = (input: LegacyState | null | undefined): AppState 
       typeof rawPrintSettings.lineHeight === "number"
         ? rawPrintSettings.lineHeight
         : Number(rawPrintSettings.lineHeight) || DEFAULT_PRINT_SETTINGS.lineHeight,
+    printMarginMm:
+      typeof rawPrintSettings.printMarginMm === "number"
+        ? rawPrintSettings.printMarginMm
+        : Number(rawPrintSettings.printMarginMm) || DEFAULT_PRINT_SETTINGS.printMarginMm,
+    printLayout: rawPrintSettings.printLayout === "double" ? "double" : "single",
+    columnGapMm:
+      typeof rawPrintSettings.columnGapMm === "number"
+        ? rawPrintSettings.columnGapMm
+        : Number(rawPrintSettings.columnGapMm) || DEFAULT_PRINT_SETTINGS.columnGapMm,
     transpose:
       typeof rawPrintSettings.transpose === "number"
         ? rawPrintSettings.transpose

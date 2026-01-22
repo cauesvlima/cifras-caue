@@ -15,6 +15,9 @@ export type PrintSettings = {
   chordColor: string
   fontSize: number
   lineHeight: number
+  printMarginMm: number
+  printLayout: "single" | "double"
+  columnGapMm: number
   showMetadata: boolean
   showChords: boolean
   transpose: number
