@@ -37,6 +37,7 @@ const MIN_MARGIN_MM = 3
 const MAX_MARGIN_MM = 20
 const MIN_COLUMN_GAP_MM = 4
 const MAX_COLUMN_GAP_MM = 20
+const EXTRA_TOP_MARGIN_MM = 10
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
 
@@ -315,7 +316,21 @@ const PrintPreview = ({ songMeta, chartText, settings }: PrintPreviewProps) => {
 
   return (
     <div className="a4-page mx-auto" style={pageStyle}>
-      <style>{`@media print { @page { size: A4; margin: ${marginMm}mm; } }`}</style>
+      <style>{`@media print {
+  @page {
+    size: A4;
+    margin-top: ${marginMm + EXTRA_TOP_MARGIN_MM}mm;
+    margin-right: ${marginMm}mm;
+    margin-bottom: ${marginMm}mm;
+    margin-left: ${marginMm}mm;
+  }
+  @page :first {
+    margin-top: ${marginMm}mm;
+    margin-right: ${marginMm}mm;
+    margin-bottom: ${marginMm}mm;
+    margin-left: ${marginMm}mm;
+  }
+}`}</style>
       <header className="flex flex-col gap-3 border-b border-black/10 pb-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>

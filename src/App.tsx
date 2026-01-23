@@ -5,6 +5,7 @@ import RawLyricsInput from "./components/RawLyricsInput"
 import ChordChartEditor from "./components/ChordChartEditor"
 import PrintPreview from "./components/PrintPreview"
 import SidePanelSettings from "./components/SidePanelSettings"
+import { transposeKeyName } from "./utils/chords"
 import type { AppState, PrintSettings, SongMeta } from "./types"
 import { DEFAULT_PRINT_SETTINGS, DEFAULT_STATE } from "./state/defaults"
 import { clearState, loadState, normalizeState, saveState } from "./utils/storage"
@@ -122,6 +123,26 @@ const App = () => {
     }))
   }
 
+  const handlePrint = () => {
+    const originalTitle = document.title
+    const title = state.songMeta.title.trim().length > 0 ? state.songMeta.title.trim() : "Sem título"
+    const transposedKey = transposeKeyName(
+      state.songMeta.key,
+      state.printSettings.transpose,
+      state.printSettings.preferFlats,
+    )
+    const keyLabel = transposedKey.trim().length > 0 ? transposedKey : "Tom indefinido"
+    document.title = `${title} - ${keyLabel}`
+
+    const restoreTitle = () => {
+      document.title = originalTitle
+      window.removeEventListener("afterprint", restoreTitle)
+    }
+
+    window.addEventListener("afterprint", restoreTitle)
+    window.print()
+  }
+
   const currentContent = () => {
     switch (state.step) {
       case 0:
@@ -175,7 +196,7 @@ const App = () => {
                 settings={state.printSettings}
                 onChange={updatePrintSettings}
                 onReset={handleResetSettings}
-                onPrint={() => window.print()}
+                onPrint={handlePrint}
               />
             </div>
           </div>
