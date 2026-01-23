@@ -12,11 +12,25 @@ type RenderedLine = {
   key: string
   text: string
   color: string
+  weight: number
 }
 
 type LinePair = {
   chord: string
   lyric: string
+}
+
+type ChartPair = {
+  index: number
+  chord: string
+  lyric: string
+  isSeparator: boolean
+}
+
+type RenderedBlock = {
+  key: string
+  lines: RenderedLine[]
+  keepTogether: boolean
 }
 
 const MIN_MARGIN_MM = 3
@@ -148,52 +162,117 @@ const PrintPreview = ({ songMeta, chartText, settings }: PrintPreviewProps) => {
     return Math.max(10, Math.floor(columnWidth / charWidth))
   }, [isTwoColumns, charWidth, contentWidth, columnGapPx])
 
-  const renderedLines = useMemo(() => {
-    const output: RenderedLine[] = []
-    const shouldWrap = isTwoColumns && charsPerLine > 0
-
+  const chartPairs = useMemo(() => {
+    const output: ChartPair[] = []
     for (let index = 0; index < lines.length; index += 2) {
-      const chordLine = lines[index] ?? ""
-      const lyricLine = lines[index + 1] ?? ""
+      const chord = lines[index] ?? ""
+      const lyric = lines[index + 1] ?? ""
+      const isSeparator = chord.trim().length === 0 && lyric.trim().length === 0
+      output.push({ index, chord, lyric, isSeparator })
+    }
+    return output
+  }, [lines])
 
-      if (!settings.showChords) {
-        const lyricSegments = shouldWrap ? wrapLine(lyricLine, charsPerLine) : [lyricLine]
-        lyricSegments.forEach((segment, segmentIndex) => {
-          output.push({
-            key: `${index}-l-${segmentIndex}`,
-            text: segment,
-            color: settings.textColor,
-          })
-        })
-        continue
+  const blocks = useMemo(() => {
+    const output: { key: string; pairs: ChartPair[]; keepTogether: boolean }[] = []
+    let current: ChartPair[] = []
+    let spacer: ChartPair[] = []
+
+    const flushStanza = () => {
+      if (!current.length) return
+      output.push({
+        key: `stanza-${current[0].index}`,
+        pairs: current,
+        keepTogether: true,
+      })
+      current = []
+    }
+
+    const flushSpacer = () => {
+      if (!spacer.length) return
+      output.push({
+        key: `spacer-${spacer[0].index}`,
+        pairs: spacer,
+        keepTogether: false,
+      })
+      spacer = []
+    }
+
+    chartPairs.forEach((pair) => {
+      if (pair.isSeparator) {
+        if (current.length) {
+          flushStanza()
+        }
+        spacer.push(pair)
+        return
       }
 
-      const transposedChordLine = transposeChordLine(
-        chordLine,
-        settings.transpose,
-        settings.preferFlats,
-      )
-      const pairs = shouldWrap
-        ? wrapPair(transposedChordLine, lyricLine, charsPerLine)
-        : [{ chord: transposedChordLine, lyric: lyricLine }]
+      if (spacer.length) flushSpacer()
+      current.push(pair)
+    })
 
-      pairs.forEach((pair, pairIndex) => {
-        output.push({
-          key: `${index}-c-${pairIndex}`,
-          text: pair.chord,
-          color: settings.chordColor,
-        })
-        output.push({
-          key: `${index}-l-${pairIndex}`,
-          text: pair.lyric,
-          color: settings.textColor,
+    flushStanza()
+    flushSpacer()
+
+    return output
+  }, [chartPairs])
+
+  const renderedBlocks = useMemo(() => {
+    const output: RenderedBlock[] = []
+    const shouldWrap = isTwoColumns && charsPerLine > 0
+
+    blocks.forEach((block) => {
+      const linesOutput: RenderedLine[] = []
+
+      block.pairs.forEach((pair) => {
+        if (!settings.showChords) {
+          const lyricSegments = shouldWrap ? wrapLine(pair.lyric, charsPerLine) : [pair.lyric]
+          lyricSegments.forEach((segment, segmentIndex) => {
+            linesOutput.push({
+              key: `${pair.index}-l-${segmentIndex}`,
+              text: segment,
+              color: settings.textColor,
+              weight: 400,
+            })
+          })
+          return
+        }
+
+        const transposedChordLine = transposeChordLine(
+          pair.chord,
+          settings.transpose,
+          settings.preferFlats,
+        )
+        const pairs = shouldWrap
+          ? wrapPair(transposedChordLine, pair.lyric, charsPerLine)
+          : [{ chord: transposedChordLine, lyric: pair.lyric }]
+
+        pairs.forEach((wrappedPair, pairIndex) => {
+          linesOutput.push({
+            key: `${pair.index}-c-${pairIndex}`,
+            text: wrappedPair.chord,
+            color: settings.chordColor,
+            weight: 700,
+          })
+          linesOutput.push({
+            key: `${pair.index}-l-${pairIndex}`,
+            text: wrappedPair.lyric,
+            color: settings.textColor,
+            weight: 400,
+          })
         })
       })
-    }
+
+      output.push({
+        key: block.key,
+        lines: linesOutput,
+        keepTogether: block.keepTogether,
+      })
+    })
 
     return output
   }, [
-    lines,
+    blocks,
     settings.showChords,
     settings.transpose,
     settings.preferFlats,
@@ -223,6 +302,15 @@ const PrintPreview = ({ songMeta, chartText, settings }: PrintPreviewProps) => {
   const pageStyle = useMemo(
     () => ({ "--print-margin": `${marginMm}mm` }) as CSSProperties,
     [marginMm],
+  )
+  const keepTogetherStyle = useMemo(
+    () =>
+      ({
+        breakInside: "avoid",
+        pageBreakInside: "avoid",
+        WebkitColumnBreakInside: "avoid",
+      }) as CSSProperties,
+    [],
   )
 
   return (
@@ -262,17 +350,19 @@ const PrintPreview = ({ songMeta, chartText, settings }: PrintPreviewProps) => {
 
       <section className="mt-6">
         <div ref={contentRef} className="mono-editor" style={{ ...baseTextStyle, ...columnsStyle }}>
-          {renderedLines.map((line) => (
+          {renderedBlocks.map((block) => (
             <div
-              key={line.key}
-              style={{
-                color: line.color,
-                whiteSpace: "pre",
-                breakInside: "avoid",
-                pageBreakInside: "avoid",
-              }}
+              key={block.key}
+              style={block.keepTogether ? keepTogetherStyle : undefined}
             >
-              {line.text.length > 0 ? line.text : "\u00A0"}
+              {block.lines.map((line) => (
+                <div
+                  key={line.key}
+                  style={{ color: line.color, whiteSpace: "pre", fontWeight: line.weight }}
+                >
+                  {line.text.length > 0 ? line.text : "\u00A0"}
+                </div>
+              ))}
             </div>
           ))}
         </div>

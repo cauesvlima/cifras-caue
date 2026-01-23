@@ -99,6 +99,18 @@
     min-height: auto;
   }
 
+  .overflow-auto,
+  .a4-page,
+  .a4-page header,
+  .a4-page section,
+  .a4-page .mono-editor,
+  .a4-page .mono-editor > div,
+  .a4-page pre {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
   @page {
     size: A4;
     margin: 12mm;
