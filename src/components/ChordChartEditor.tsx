@@ -7,7 +7,7 @@ type ChordChartEditorProps = {
   onPreview: () => void
 }
 
-const MARKERS = ["[Intro]", "[Verso]", "[Pre]", "[Refrao]", "[Ponte]"]
+const MARKERS = ["[Intro]", "[Verso]", "[Pre]", "[Refrao]", "[Ponte]" , "[Solo]"]
 const MAX_HISTORY = 120
 
 const countLines = (text: string) => text.split(/\r?\n/).length

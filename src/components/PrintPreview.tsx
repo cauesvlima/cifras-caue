@@ -27,6 +27,25 @@ type ChartPair = {
   isSeparator: boolean
 }
 
+type InstrumentalLine = {
+  index: number
+  text: string
+}
+
+type ParsedBlock =
+  | {
+      key: string
+      type: "pairs"
+      pairs: ChartPair[]
+      keepTogether: boolean
+    }
+  | {
+      key: string
+      type: "instrumental"
+      lines: InstrumentalLine[]
+      keepTogether: boolean
+    }
+
 type RenderedBlock = {
   key: string
   lines: RenderedLine[]
@@ -117,6 +136,25 @@ const wrapPair = (chordLine: string, lyricLine: string, maxChars: number) => {
   return pairs
 }
 
+const TAG_REGEX = /^\s*\[([^\]]+)\]/
+const INSTRUMENTAL_TAGS = ["solo", "instrumental", "interludio", "turnaround", "interlude"]
+
+const normalizeTagLabel = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+
+const getTagInfo = (line: string) => {
+  const match = line.match(TAG_REGEX)
+  if (!match) {
+    return { isTag: false, isInstrumental: false }
+  }
+  const normalized = normalizeTagLabel(match[1].trim())
+  const isInstrumental = INSTRUMENTAL_TAGS.some((tag) => normalized.startsWith(tag))
+  return { isTag: true, isInstrumental }
+}
+
 const PrintPreview = ({ songMeta, chartText, settings }: PrintPreviewProps) => {
   const tuningLabel =
     songMeta.tuning === "custom" ? songMeta.customTuning || "Custom" : songMeta.tuning
@@ -163,26 +201,17 @@ const PrintPreview = ({ songMeta, chartText, settings }: PrintPreviewProps) => {
     return Math.max(10, Math.floor(columnWidth / charWidth))
   }, [isTwoColumns, charWidth, contentWidth, columnGapPx])
 
-  const chartPairs = useMemo(() => {
-    const output: ChartPair[] = []
-    for (let index = 0; index < lines.length; index += 2) {
-      const chord = lines[index] ?? ""
-      const lyric = lines[index + 1] ?? ""
-      const isSeparator = chord.trim().length === 0 && lyric.trim().length === 0
-      output.push({ index, chord, lyric, isSeparator })
-    }
-    return output
-  }, [lines])
-
-  const blocks = useMemo(() => {
-    const output: { key: string; pairs: ChartPair[]; keepTogether: boolean }[] = []
+  const blocks = useMemo<ParsedBlock[]>(() => {
+    const output: ParsedBlock[] = []
     let current: ChartPair[] = []
     let spacer: ChartPair[] = []
+    let pendingChord: { index: number; text: string } | null = null
 
     const flushStanza = () => {
       if (!current.length) return
       output.push({
         key: `stanza-${current[0].index}`,
+        type: "pairs",
         pairs: current,
         keepTogether: true,
       })
@@ -193,13 +222,14 @@ const PrintPreview = ({ songMeta, chartText, settings }: PrintPreviewProps) => {
       if (!spacer.length) return
       output.push({
         key: `spacer-${spacer[0].index}`,
+        type: "pairs",
         pairs: spacer,
         keepTogether: false,
       })
       spacer = []
     }
 
-    chartPairs.forEach((pair) => {
+    const pushPair = (pair: ChartPair) => {
       if (pair.isSeparator) {
         if (current.length) {
           flushStanza()
@@ -210,13 +240,87 @@ const PrintPreview = ({ songMeta, chartText, settings }: PrintPreviewProps) => {
 
       if (spacer.length) flushSpacer()
       current.push(pair)
-    })
+    }
+
+    let lineIndex = 0
+    while (lineIndex < lines.length) {
+      const line = lines[lineIndex] ?? ""
+      const tagInfo = getTagInfo(line)
+
+      if (tagInfo.isInstrumental) {
+        if (pendingChord) {
+          const chord = pendingChord.text
+          const lyric = ""
+          pushPair({
+            index: pendingChord.index,
+            chord,
+            lyric,
+            isSeparator: chord.trim().length === 0 && lyric.trim().length === 0,
+          })
+          pendingChord = null
+        }
+
+        if (current.length) flushStanza()
+        if (spacer.length) flushSpacer()
+
+        const blockLines: InstrumentalLine[] = []
+        const startIndex = lineIndex
+
+        while (lineIndex < lines.length) {
+          const currentLine = lines[lineIndex] ?? ""
+          const currentTag = getTagInfo(currentLine)
+          const isBlank = currentLine.trim().length === 0
+          if (lineIndex !== startIndex && (isBlank || currentTag.isTag)) {
+            break
+          }
+          blockLines.push({ index: lineIndex, text: currentLine })
+          lineIndex += 1
+        }
+
+        output.push({
+          key: `instrumental-${startIndex}`,
+          type: "instrumental",
+          lines: blockLines,
+          keepTogether: true,
+        })
+        continue
+      }
+
+      if (!pendingChord) {
+        pendingChord = { index: lineIndex, text: line }
+        lineIndex += 1
+        continue
+      }
+
+      const chord = pendingChord.text
+      const lyric = line
+      pushPair({
+        index: pendingChord.index,
+        chord,
+        lyric,
+        isSeparator: chord.trim().length === 0 && lyric.trim().length === 0,
+      })
+      pendingChord = null
+      lineIndex += 1
+    }
+
+    if (pendingChord) {
+      const chord = pendingChord.text
+      const lyric = ""
+      pushPair({
+        index: pendingChord.index,
+        chord,
+        lyric,
+        isSeparator: chord.trim().length === 0 && lyric.trim().length === 0,
+      })
+      pendingChord = null
+    }
 
     flushStanza()
     flushSpacer()
 
     return output
-  }, [chartPairs])
+  }, [lines])
 
   const renderedBlocks = useMemo(() => {
     const output: RenderedBlock[] = []
@@ -224,6 +328,33 @@ const PrintPreview = ({ songMeta, chartText, settings }: PrintPreviewProps) => {
 
     blocks.forEach((block) => {
       const linesOutput: RenderedLine[] = []
+
+      if (block.type === "instrumental") {
+        if (!settings.showChords) return
+        block.lines.forEach((line) => {
+          const transposedLine = transposeChordLine(
+            line.text,
+            settings.transpose,
+            settings.preferFlats,
+          )
+          const segments = shouldWrap ? wrapLine(transposedLine, charsPerLine) : [transposedLine]
+          segments.forEach((segment, segmentIndex) => {
+            linesOutput.push({
+              key: `${line.index}-i-${segmentIndex}`,
+              text: segment,
+              color: settings.chordColor,
+              weight: 700,
+            })
+          })
+        })
+
+        output.push({
+          key: block.key,
+          lines: linesOutput,
+          keepTogether: block.keepTogether,
+        })
+        return
+      }
 
       block.pairs.forEach((pair) => {
         if (!settings.showChords) {
