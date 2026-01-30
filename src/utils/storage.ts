@@ -1,4 +1,4 @@
-import type { AppState, PrintSettings } from "../types"
+import type { AppState, PrintSettings, SongMeta } from "../types"
 import { DEFAULT_PRINT_SETTINGS, DEFAULT_SONG_META, DEFAULT_STATE, STORAGE_KEY } from "../state/defaults"
 
 type LegacyChartLine = {
@@ -19,6 +19,10 @@ const legacyChartLinesToText = (lines: unknown) => {
 }
 
 type LegacyState = Partial<AppState> & { chartLines?: unknown }
+
+const STORAGE_META_KEY = `${STORAGE_KEY}-meta`
+const STORAGE_LYRICS_KEY = `${STORAGE_KEY}-lyrics`
+const STORAGE_CHART_KEY = `${STORAGE_KEY}-chart`
 
 export const normalizeState = (input: LegacyState | null | undefined): AppState => {
   const rawSongMeta = { ...DEFAULT_SONG_META, ...(input?.songMeta ?? {}) }
@@ -81,19 +85,51 @@ export const normalizeState = (input: LegacyState | null | undefined): AppState 
 
 export const loadState = (): AppState | null => {
   const raw = localStorage.getItem(STORAGE_KEY)
-  if (!raw) return null
-  try {
-    const parsed = JSON.parse(raw) as Partial<AppState>
-    return normalizeState(parsed)
-  } catch {
-    return null
+  const rawMeta = localStorage.getItem(STORAGE_META_KEY)
+  const rawLyrics = localStorage.getItem(STORAGE_LYRICS_KEY)
+  const rawChart = localStorage.getItem(STORAGE_CHART_KEY)
+
+  if (!raw && !rawMeta && rawLyrics === null && rawChart === null) return null
+
+  let base: Partial<AppState> = {}
+  if (raw) {
+    try {
+      base = JSON.parse(raw) as Partial<AppState>
+    } catch {
+      base = {}
+    }
   }
+
+  let meta: Partial<SongMeta> | undefined
+  if (rawMeta) {
+    try {
+      meta = JSON.parse(rawMeta) as Partial<SongMeta>
+    } catch {
+      meta = undefined
+    }
+  }
+
+  const merged: Partial<AppState> = {
+    ...base,
+    songMeta: meta ?? base.songMeta,
+    rawLyrics: rawLyrics !== null ? rawLyrics : base.rawLyrics,
+    chartText: rawChart !== null ? rawChart : base.chartText,
+  }
+
+  return normalizeState(merged)
 }
 
 export const saveState = (state: AppState) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  const { songMeta, rawLyrics, chartText, ...rest } = state
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(rest))
+  localStorage.setItem(STORAGE_META_KEY, JSON.stringify(songMeta))
+  localStorage.setItem(STORAGE_LYRICS_KEY, rawLyrics)
+  localStorage.setItem(STORAGE_CHART_KEY, chartText)
 }
 
 export const clearState = () => {
   localStorage.removeItem(STORAGE_KEY)
+  localStorage.removeItem(STORAGE_META_KEY)
+  localStorage.removeItem(STORAGE_LYRICS_KEY)
+  localStorage.removeItem(STORAGE_CHART_KEY)
 }

@@ -2,15 +2,17 @@ type StepperProps = {
   steps: string[]
   currentStep: number
   onStepChange?: (index: number) => void
+  isStepEnabled?: (index: number) => boolean
 }
 
-const Stepper = ({ steps, currentStep, onStepChange }: StepperProps) => {
+const Stepper = ({ steps, currentStep, onStepChange, isStepEnabled }: StepperProps) => {
   return (
     <div className="flex flex-wrap items-center gap-3">
       {steps.map((label, index) => {
         const isActive = index === currentStep
         const isCompleted = index < currentStep
-        const canClick = onStepChange && index <= currentStep
+        const enabledByRule = isStepEnabled ? isStepEnabled(index) : index <= currentStep
+        const canClick = Boolean(onStepChange) && enabledByRule
         return (
           <button
             key={label}
